@@ -5,14 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#111111">
-<title>做T成本账本 V2.0</title>
+<title>做T成本账本 V2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
- --bg:#101010;--panel:#1b1b1b;--panel2:#242424;
- --gold:#c6a15b;--gold2:#e0bd79;--etf:#36b9a5;--stock:#c69a52;
- --red:#e5484d;--green:#22a06b;--text:#f2f0eb;
- --muted:#999;--line:#363636
+--bg:#101010;--panel:#1b1b1b;--panel2:#242424;
+--gold:#c6a15b;--gold2:#e0bd79;--etf:#36b9a5;
+--stock:#c69a52;--red:#e5484d;--green:#22a06b;
+--text:#f2f0eb;--muted:#999;--line:#363636;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;padding-bottom:35px}
@@ -34,532 +34,841 @@ input,select{width:100%;background:#111;color:var(--text);border:1px solid #444;
 input:focus,select:focus{border-color:var(--gold)}
 .field{margin-bottom:12px;min-width:0}
 button{border:0;border-radius:8px;padding:10px 13px;font-size:12px;font-weight:600;cursor:pointer}
-.primary{background:var(--gold);color:#17130c}.secondary{background:#333;color:#eee;border:1px solid #555}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:var(--gold);color:#17130c}
+.secondary{background:#333;color:#eee;border:1px solid #555}
 .danger{background:#482526;color:#ffaaaa;border:1px solid #713638}
 .tabs{display:flex;gap:7px;overflow-x:auto;margin:15px 0}
 .tab{white-space:nowrap;background:#222;color:#aaa;border:1px solid #444;padding:9px 13px;border-radius:20px}
 .tab.active{background:#4b3b20;color:#f1d49b;border-color:var(--gold)}
-.toolbar{display:flex;gap:7px;flex-wrap:wrap}.toolbar button{flex:1;min-width:90px}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap}
+.toolbar button{flex:1;min-width:75px}
 .actions{display:flex;gap:8px}.actions button{flex:1}
 .notice{border:1px solid #51432b;background:#292318;color:#d8c39b;padding:11px;border-radius:9px;font-size:12px;line-height:1.7}
 .muted{color:var(--muted)}.small{font-size:11px}
 .tag{display:inline-block;border-radius:5px;padding:3px 7px;font-size:10px;background:#333}
-.tag.etf{background:#153b36;color:#6de0cf!important}.tag.stock{background:#45351e;color:#e3bd7c!important}
+.tag.etf{background:#153b36;color:#6de0cf!important}
+.tag.stock{background:#45351e;color:#e3bd7c!important}
 .hidden{display:none!important}.empty{text-align:center;color:#777;padding:24px}
 .table-wrap{overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:720px;font-size:12px}
 th,td{padding:10px 8px;border-bottom:1px solid #333;text-align:right;white-space:nowrap}
 th{color:#bba77d;background:#222}th:first-child,td:first-child{text-align:left}
 hr{border:0;border-top:1px solid #383838;margin:15px 0}
-@media(min-width:700px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0;font-size:12px}
+.legend-item{display:flex;align-items:center;gap:7px}
+.legend-line{width:23px;height:3px;border-radius:5px}
+.chart-wrap{width:100%;overflow:hidden;background:#151515;border-radius:10px;padding:8px 4px}
+#costChart{width:100%;height:auto;display:block;min-height:190px}
+.range-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:12px 0}
+.range-btn{padding:9px 3px;background:#292929;color:#aaa;border:1px solid #444}
+.range-btn.active{background:#4b3b20;color:#f1d49b;border-color:var(--gold)}
+.chart-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.chart-info .stat strong{font-size:15px}
+@media(min-width:700px){
+.grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:380px){
+.range-btn{font-size:10px}
+}
 footer{text-align:center;color:#666;font-size:11px;padding:20px}
 </style>
 </head>
 <body>
 <header>
- <h1>做T成本账本 <span style="font-size:11px;color:#888">V2.0</span></h1>
- <p>真实持仓成本 · FIFO · 跨日波段T · 本地账本</p>
+<h1>做T成本账本 <span style="font-size:11px;color:#888">V2.1</span></h1>
+<p>真实持仓成本 · FIFO · 跨日波段T · 成本曲线 · 本地账本</p>
 </header>
 <main>
- <div class="notice">
- 数据仅保存在当前浏览器。请定期导出JSON备份。清除浏览器数据、更换设备或浏览器前，请先备份。
- </div>
+<div class="notice">
+数据仅保存在当前浏览器。请定期导出JSON备份。清除浏览器数据、更换设备或浏览器前，请先备份。
+</div>
 
- <div class="title">账户概览</div>
- <div class="grid">
-  <div class="stat"><small>当前剩余持仓成本</small><strong id="totalCost">0.00</strong><div class="sub">不扣除任何T利润</div></div>
-  <div class="stat"><small>真实持仓均价</small><strong id="avgAll">—</strong><div class="sub">按剩余批次实际成本计算</div></div>
-  <div class="stat"><small>累计已完成T净利润</small><strong id="tProfit">0.00</strong><div class="sub">已匹配回补部分，扣除相关费用</div></div>
-  <div class="stat"><small>T利润摊薄参考成本</small><strong id="adjustedAvg">—</strong><div class="sub">分析参考，不是真实持仓成本</div></div>
-  <div class="stat"><small>累计已实现盈亏</small><strong id="realized">0.00</strong><div class="sub">相对原始FIFO买入成本</div></div>
-  <div class="stat"><small>累计交易费用</small><strong id="fees">0.00</strong><div class="sub">买卖双方费用</div></div>
-  <div class="stat"><small>当前持仓证券数</small><strong id="securityCount">0</strong><div class="sub">有剩余持仓的证券</div></div>
-  <div class="stat"><small>待回补数量</small><strong id="pendingCount">0</strong><div class="sub">尚未匹配买回的卖出数量</div></div>
- </div>
+<div class="title">账户概览</div>
+<div class="grid">
+<div class="stat"><small>当前剩余持仓成本</small><strong id="totalCost">0.00</strong><div class="sub">不扣除任何T利润</div></div>
+<div class="stat"><small>真实持仓均价</small><strong id="avgAll">—</strong><div class="sub">按剩余批次实际成本计算</div></div>
+<div class="stat"><small>累计已完成T净利润</small><strong id="tProfit">0.00</strong><div class="sub">已匹配回补部分，扣除相关费用</div></div>
+<div class="stat"><small>T利润摊薄参考成本</small><strong id="adjustedAvg">—</strong><div class="sub">分析参考，不是真实持仓成本</div></div>
+<div class="stat"><small>累计已实现盈亏</small><strong id="realized">0.00</strong><div class="sub">相对原始FIFO买入成本</div></div>
+<div class="stat"><small>累计交易费用</small><strong id="fees">0.00</strong><div class="sub">买卖双方费用</div></div>
+<div class="stat"><small>当前持仓证券数</small><strong id="securityCount">0</strong><div class="sub">有剩余持仓的证券</div></div>
+<div class="stat"><small>待回补数量</small><strong id="pendingCount">0</strong><div class="sub">尚未匹配买回的卖出数量</div></div>
+</div>
 
- <div class="tabs">
-  <button class="tab active" data-tab="positions">持仓总览</button>
-  <button class="tab" data-tab="tlist">T收益记录</button>
-  <button class="tab" data-tab="trades">交易流水</button>
-  <button class="tab" data-tab="add">录入交易</button>
-  <button class="tab" data-tab="settings">费率设置</button>
-  <button class="tab" data-tab="data">数据管理</button>
- </div>
+<div class="tabs">
+<button class="tab active" data-tab="positions">持仓总览</button>
+<button class="tab" data-tab="tlist">T收益记录</button>
+<button class="tab" data-tab="trades">交易流水</button>
+<button class="tab" data-tab="add">录入交易</button>
+<button class="tab" data-tab="settings">费率设置</button>
+<button class="tab" data-tab="data">数据管理</button>
+</div>
 
- <section id="page-positions">
-  <div class="title">我的持仓</div>
-  <div id="positionList"></div>
-  <div class="title">成本口径说明</div>
-  <div class="notice">
-   <b>真实持仓均价：</b>当前剩余买入批次的买入金额加买入费用，再除以剩余数量。完全不扣除T利润。<br>
-   <b>T利润摊薄参考成本：</b>（剩余持仓成本－累计已完成T净利润）÷当前持仓数量。仅作分析参考。<br>
-   <b>已实现盈亏：</b>卖出净收入减去FIFO结转的原始买入成本。<br>
-   <b>T净利润：</b>卖出净收入减去对应回补买入总成本。它与已实现盈亏是不同观察口径，不可相加当作总收益。
-  </div>
- </section>
+<section id="page-positions">
+<div class="title">我的持仓</div>
+<div id="positionList"></div>
 
- <section id="page-tlist" class="hidden">
-  <div class="title">跨日 / 日内T收益</div>
-  <div id="tSummary"></div>
-  <div id="tRecords"></div>
-  <div class="notice">
-   自动匹配规则：同一证券的卖出后买入，按时间先后及FIFO匹配；部分回补会按数量拆分。填写相同的T组标记可以优先进行指定匹配。卖出记录可以手动结束，结束后未回补部分不再自动匹配。
-  </div>
- </section>
+<div class="title">持仓成本曲线</div>
+<div class="card">
+<div class="field">
+<label>选择证券</label>
+<select id="chartSecurity"></select>
+</div>
+<div class="range-buttons">
+<button class="range-btn active" data-range="7">一周</button>
+<button class="range-btn" data-range="30">一个月</button>
+<button class="range-btn" data-range="90">三个月</button>
+<button class="range-btn" data-range="365">一年</button>
+<button class="range-btn" data-range="custom">自定义</button>
+</div>
+<div id="customDates" class="formgrid hidden">
+<div class="field"><label>开始日期</label><input type="date" id="chartStart"></div>
+<div class="field"><label>结束日期</label><input type="date" id="chartEnd"></div>
+</div>
+<div class="chart-legend">
+<div class="legend-item"><span class="legend-line" style="background:#D6A64B"></span><span class="gold">真实持仓均价</span></div>
+<div class="legend-item"><span class="legend-line" style="background:#36B9A5"></span><span class="etf">T利润摊薄参考均价</span></div>
+</div>
+<div class="chart-wrap">
+<svg id="costChart" viewBox="0 0 700 300" role="img" aria-label="持仓成本曲线"></svg>
+</div>
+<div class="chart-info">
+<div class="stat"><small>区间最新真实均价</small><strong id="chartReal">—</strong></div>
+<div class="stat"><small>区间最新参考均价</small><strong id="chartAdjusted">—</strong></div>
+</div>
+<div class="small muted" id="chartPeriod" style="margin-top:10px"></div>
+<div class="notice" style="margin-top:12px">
+<b style="color:#D6A64B">金黄色曲线：真实持仓均价。</b>按当前剩余持仓批次的买入金额和买入费用计算，不扣除T利润。<br>
+<b style="color:#36B9A5">青绿色曲线：T利润摊薄参考均价。</b>真实剩余持仓成本扣除已完成T净利润后计算，仅供分析参考，不代表券商实际成本。<br>
+图表按交易发生后的每日持仓状态绘制。清仓期间没有持仓均价，不会用虚构数据连接。
+</div>
+</div>
 
- <section id="page-trades" class="hidden">
-  <div class="title">交易流水</div>
-  <div class="toolbar" style="margin-bottom:12px">
-   <button class="secondary" onclick="filterTrades('all')">全部</button>
-   <button class="secondary" onclick="filterTrades('BUY')">买入</button>
-   <button class="secondary" onclick="filterTrades('SELL')">卖出</button>
-  </div>
-  <div id="tradeList"></div>
- </section>
+<div class="title">成本口径说明</div>
+<div class="notice">
+<b>真实持仓均价：</b>当前剩余买入批次的买入金额加买入费用，再除以剩余数量。完全不扣除T利润。<br>
+<b>T利润摊薄参考成本：</b>（剩余持仓成本－该证券累计已完成T净利润）÷当前持仓数量。仅作分析参考。<br>
+<b>已实现盈亏：</b>卖出净收入减去FIFO结转的原始买入成本。<br>
+<b>T净利润：</b>卖出净收入减去对应回补买入总成本。它与已实现盈亏是不同观察口径，不可相加当作总收益。
+</div>
+</section>
 
- <section id="page-add" class="hidden">
-  <div class="title" id="formTitle">录入交易</div>
-  <div class="card">
-   <form id="tradeForm">
-    <input type="hidden" id="editId">
-    <div class="formgrid">
-     <div class="field"><label>证券代码</label><input id="code" placeholder="例如：515450" required></div>
-     <div class="field"><label>证券名称</label><input id="name" placeholder="例如：红利低波ETF" required></div>
-     <div class="field"><label>证券类型</label><select id="type"><option value="ETF">ETF</option><option value="STOCK">A股个股</option></select></div>
-     <div class="field"><label>交易方向</label><select id="side"><option value="BUY">买入</option><option value="SELL">卖出</option></select></div>
-     <div class="field"><label>成交时间</label><input id="date" type="datetime-local" required></div>
-     <div class="field"><label>成交价格（元）</label><input id="price" type="number" min="0.001" step="0.001" required></div>
-     <div class="field"><label>成交数量（股/份）</label><input id="qty" type="number" min="100" step="100" required></div>
-     <div class="field"><label>实际总费用（选填）</label><input id="fee" type="number" min="0" step="0.01" placeholder="留空自动估算"></div>
-    </div>
-    <div class="field"><label>T组标记（选填）</label><input id="tGroup" placeholder="例如：515450-T01；同轮卖出和买入填相同标记"></div>
-    <div class="field"><label>备注</label><input id="memo" placeholder="例如：回落补仓 / 波段卖出"></div>
-    <div class="notice small" style="margin-bottom:12px">
-     手续费填写实际总费用时，以实际费用为准，不重复估算。留空则按费率计算。卖出后买入会自动寻找待回补卖出记录。
-    </div>
-    <div class="actions">
-     <button class="primary" type="submit" id="saveBtn">保存交易</button>
-     <button class="secondary" type="button" onclick="resetForm()">清空</button>
-    </div>
-   </form>
-  </div>
- </section>
+<section id="page-tlist" class="hidden">
+<div class="title">跨日 / 日内T收益</div>
+<div id="tSummary"></div>
+<div id="tRecords"></div>
+<div class="notice">
+自动匹配规则：同一证券的卖出后买入，按时间先后及FIFO匹配；部分回补会按数量拆分。填写相同的T组标记可以优先进行指定匹配。卖出记录可以手动结束，结束后未回补部分不再自动匹配。
+</div>
+</section>
 
- <section id="page-settings" class="hidden">
-  <div class="title">交易费率设置</div>
-  <div class="card">
-   <h3 class="etf" style="margin-top:0">ETF</h3>
-   <div class="formgrid">
-    <div class="field"><label>佣金（万分之）</label><input id="etfRate" type="number" step="0.01"></div>
-    <div class="field"><label>最低佣金（元）</label><input id="etfMin" type="number" step="0.01"></div>
-   </div>
-   <hr>
-   <h3 class="stock">A股个股</h3>
-   <div class="formgrid">
-    <div class="field"><label>佣金（万分之）</label><input id="stockRate" type="number" step="0.01"></div>
-    <div class="field"><label>最低佣金（元）</label><input id="stockMin" type="number" step="0.01"></div>
-    <div class="field"><label>卖出印花税（‰）</label><input id="stampRate" type="number" step="0.01"></div>
-    <div class="field"><label>过户费（‰，双向）</label><input id="transferRate" type="number" step="0.001"></div>
-   </div>
-   <button class="primary" onclick="saveSettings()">保存费率</button>
-  </div>
-  <div class="notice">默认：ETF佣金万0.5、最低0.1元；个股佣金万0.86、最低0.1元；卖出印花税0.5‰；过户费双向0.01‰。请以实际交割单为准。</div>
- </section>
+<section id="page-trades" class="hidden">
+<div class="title">交易流水</div>
+<div class="toolbar" style="margin-bottom:12px">
+<button class="secondary" onclick="filterTrades('all')">全部</button>
+<button class="secondary" onclick="filterTrades('BUY')">买入</button>
+<button class="secondary" onclick="filterTrades('SELL')">卖出</button>
+</div>
+<div id="tradeList"></div>
+</section>
 
- <section id="page-data" class="hidden">
-  <div class="title">数据管理</div>
-  <div class="card">
-   <h3 style="margin-top:0">JSON完整备份</h3>
-   <div class="toolbar">
-    <button class="primary" onclick="backupJSON()">导出JSON备份</button>
-    <button class="secondary" onclick="document.getElementById('jsonFile').click()">导入JSON备份</button>
-    <input id="jsonFile" type="file" accept=".json,application/json" class="hidden">
-   </div>
-   <p class="small muted">备份包含证券、交易流水、T组和费率。恢复会覆盖当前数据。</p>
-  </div>
-  <div class="card">
-   <h3 style="margin-top:0">Excel / CSV</h3>
-   <div class="toolbar">
-    <button class="primary" onclick="exportExcel()">导出Excel</button>
-    <button class="secondary" onclick="document.getElementById('excelFile').click()">导入Excel/CSV</button>
-    <button class="secondary" onclick="downloadTemplate()">下载模板</button>
-    <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" class="hidden">
-   </div>
-   <p class="small muted">字段：code,name,type,side,date,price,qty,fee,tGroup,memo。银河证券原始表格仍需按实际样表核对字段。</p>
-  </div>
-  <div class="card">
-   <h3 style="color:#e58a8a;margin-top:0">清空账本</h3>
-   <button class="danger" onclick="clearAll()">删除全部数据</button>
-  </div>
- </section>
+<section id="page-add" class="hidden">
+<div class="title" id="formTitle">录入交易</div>
+<div class="card">
+<form id="tradeForm">
+<input type="hidden" id="editId">
+<div class="formgrid">
+<div class="field"><label>证券代码</label><input id="code" placeholder="例如：515450" required></div>
+<div class="field"><label>证券名称</label><input id="name" placeholder="例如：红利低波ETF" required></div>
+<div class="field"><label>证券类型</label><select id="type"><option value="ETF">ETF</option><option value="STOCK">A股个股</option></select></div>
+<div class="field"><label>交易方向</label><select id="side"><option value="BUY">买入</option><option value="SELL">卖出</option></select></div>
+<div class="field"><label>成交时间</label><input id="date" type="datetime-local" required></div>
+<div class="field"><label>成交价格（元）</label><input id="price" type="number" min="0.001" step="0.001" required></div>
+<div class="field"><label>成交数量（股/份）</label><input id="qty" type="number" min="100" step="100" required></div>
+<div class="field"><label>实际总费用（选填）</label><input id="fee" type="number" min="0" step="0.01" placeholder="留空自动估算"></div>
+</div>
+<div class="field"><label>T组标记（选填）</label><input id="tGroup" placeholder="例如：515450-T01；同轮卖出和买入填相同标记"></div>
+<div class="field"><label>备注</label><input id="memo" placeholder="例如：回落补仓 / 波段卖出"></div>
+<div class="notice small" style="margin-bottom:12px">
+手续费填写实际总费用时，以实际费用为准，不重复估算。留空则按费率计算。卖出后买入会自动寻找待回补卖出记录。
+</div>
+<div class="actions">
+<button class="primary" type="submit" id="saveBtn">保存交易</button>
+<button class="secondary" type="button" onclick="resetForm()">清空</button>
+</div>
+</form>
+</div>
+</section>
+
+<section id="page-settings" class="hidden">
+<div class="title">交易费率设置</div>
+<div class="card">
+<h3 class="etf" style="margin-top:0">ETF</h3>
+<div class="formgrid">
+<div class="field"><label>佣金（万分之）</label><input id="etfRate" type="number" step="0.01"></div>
+<div class="field"><label>最低佣金（元）</label><input id="etfMin" type="number" step="0.01"></div>
+</div>
+<hr>
+<h3 class="stock">A股个股</h3>
+<div class="formgrid">
+<div class="field"><label>佣金（万分之）</label><input id="stockRate" type="number" step="0.01"></div>
+<div class="field"><label>最低佣金（元）</label><input id="stockMin" type="number" step="0.01"></div>
+<div class="field"><label>卖出印花税（‰）</label><input id="stampRate" type="number" step="0.01"></div>
+<div class="field"><label>过户费（‰，双向）</label><input id="transferRate" type="number" step="0.001"></div>
+</div>
+<button class="primary" onclick="saveSettings()">保存费率</button>
+</div>
+<div class="notice">默认：ETF佣金万0.5、最低0.1元；个股佣金万0.86、最低0.1元；卖出印花税0.5‰；过户费双向0.01‰。请以实际交割单为准。</div>
+</section>
+
+<section id="page-data" class="hidden">
+<div class="title">数据管理</div>
+<div class="card">
+<h3 style="margin-top:0">JSON完整备份</h3>
+<div class="toolbar">
+<button class="primary" onclick="backupJSON()">导出JSON备份</button>
+<button class="secondary" onclick="document.getElementById('jsonFile').click()">导入JSON备份</button>
+<input id="jsonFile" type="file" accept=".json,application/json" class="hidden">
+</div>
+<p class="small muted">备份包含证券、交易流水、T组和费率。恢复会覆盖当前数据。</p>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Excel / CSV</h3>
+<div class="toolbar">
+<button class="primary" onclick="exportExcel()">导出Excel</button>
+<button class="secondary" onclick="document.getElementById('excelFile').click()">导入Excel/CSV</button>
+<button class="secondary" onclick="downloadTemplate()">下载模板</button>
+<input id="excelFile" type="file" accept=".xlsx,.xls,.csv" class="hidden">
+</div>
+<p class="small muted">字段：code,name,type,side,date,price,qty,fee,tGroup,memo。银河证券原始表格仍需按实际样表核对字段。</p>
+</div>
+<div class="card">
+<h3 style="color:#e58a8a;margin-top:0">清空账本</h3>
+<button class="danger" onclick="clearAll()">删除全部数据</button>
+</div>
+</section>
 </main>
-<footer>做T成本账本 V2.0 · 本地保存 · 请定期备份</footer>
+<footer>做T成本账本 V2.1 · 本地保存 · 请定期备份</footer>
 
 <script>
 "use strict";
 const KEY="t_cost_ledger_v2";
 const DEFAULT={
- securities:[],trades:[],
- settings:{etfRate:.5,etfMin:.1,stockRate:.86,stockMin:.1,stampRate:.5,transferRate:.01}
+securities:[],trades:[],
+settings:{etfRate:.5,etfMin:.1,stockRate:.86,stockMin:.1,stampRate:.5,transferRate:.01}
 };
 let state=load();
 let tradeFilter="all";
+let chartRange=30;
+let chartCustom=false;
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function load(){
- try{
-  const x=JSON.parse(localStorage.getItem(KEY)||"null");
-  if(!x)return clone(DEFAULT);
-  return {securities:Array.isArray(x.securities)?x.securities:[],trades:Array.isArray(x.trades)?x.trades:[],settings:{...DEFAULT.settings,...(x.settings||{})}};
- }catch(e){return clone(DEFAULT)}
+try{
+const x=JSON.parse(localStorage.getItem(KEY)||"null");
+if(!x)return clone(DEFAULT);
+return {
+securities:Array.isArray(x.securities)?x.securities:[],
+trades:Array.isArray(x.trades)?x.trades:[],
+settings:{...DEFAULT.settings,...(x.settings||{})}
+};
+}catch(e){return clone(DEFAULT)}
 }
 function persist(){localStorage.setItem(KEY,JSON.stringify(state))}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
-function num(x){return Number(x)||0}
+function num(x){const n=Number(x);return Number.isFinite(n)?n:0}
 function fmt(x){return num(x).toLocaleString("zh-CN",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function esc(x){return String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function feeOf(t){
- if(t.fee!==null&&t.fee!==undefined&&t.fee!=="")return num(t.fee);
- const amount=num(t.price)*num(t.qty),s=t.type;
- const rate=s==="ETF"?state.settings.etfRate:state.settings.stockRate;
- const min=s==="ETF"?state.settings.etfMin:state.settings.stockMin;
- let f=Math.max(amount*num(rate)/10000,num(min));
- if(s==="STOCK"){
-  if(t.side==="SELL")f+=amount*num(state.settings.stampRate)/1000;
-  f+=amount*num(state.settings.transferRate)/1000;
- }
- return f;
+if(t.fee!==null&&t.fee!==undefined&&t.fee!=="")return num(t.fee);
+const amount=num(t.price)*num(t.qty),s=t.type;
+const rate=s==="ETF"?state.settings.etfRate:state.settings.stockRate;
+const min=s==="ETF"?state.settings.etfMin:state.settings.stockMin;
+let f=Math.max(amount*num(rate)/10000,num(min));
+if(s==="STOCK"){
+if(t.side==="SELL")f+=amount*num(state.settings.stampRate)/1000;
+f+=amount*num(state.settings.transferRate)/1000;
+}
+return f;
 }
 function sortedTrades(){
- return [...state.trades].sort((a,b)=>String(a.date).localeCompare(String(b.date))||num(a.created)-num(b.created));
+return [...state.trades].sort((a,b)=>String(a.date).localeCompare(String(b.date))||num(a.created)-num(b.created));
 }
 function securities(){
- const m=new Map();
- state.securities.forEach(s=>m.set(s.code,s));
- state.trades.forEach(t=>{if(!m.has(t.code))m.set(t.code,{code:t.code,name:t.name,type:t.type})});
- return [...m.values()];
+const m=new Map();
+state.securities.forEach(s=>m.set(s.code,s));
+state.trades.forEach(t=>{if(!m.has(t.code))m.set(t.code,{code:t.code,name:t.name,type:t.type})});
+return [...m.values()];
 }
 
-/* 核算：FIFO持仓、已实现盈亏、T卖出-回补匹配 */
+/* 统一核算：所有成本都由“数量×单位成本”汇总，避免重复累计金额 */
 function calculate(){
- const secMap=new Map(securities().map(s=>[s.code,s]));
- const book={};
- secMap.forEach((s,k)=>book[k]={security:s,lots:[],realized:0,fees:0,invalid:false});
- let totalFees=0,realized=0;
- const pending=[];
- const tRecords=[];
- const ts=sortedTrades();
+const secMap=new Map(securities().map(s=>[s.code,s]));
+const book={};
+secMap.forEach((s,k)=>book[k]={
+security:s,lots:[],realized:0,fees:0,invalid:false,invalidQty:0
+});
+let totalFees=0,realized=0;
+const pending=[],tRecords=[],history={};
+const ts=sortedTrades();
 
- function matchBuyToPending(buy,remaining,feePerUnit){
-  // 有明确T组标记时，先匹配相同组；空标记只匹配空标记。
-  const candidates=pending.filter(p=>!p.closed&&p.code===buy.code&&p.remaining>0&&
-    String(p.tGroup||"")===String(buy.tGroup||"")&&
-    String(p.date)<=String(buy.date));
-  for(const p of candidates){
-   if(remaining<=0)break;
-   const q=Math.min(remaining,p.remaining);
-   const sellFeePart=p.fee*(q/p.qty);
-   const buyFeePart=feePerUnit*q;
-   const sellNet=q*p.price-sellFeePart;
-   const buyCost=q*buy.price+buyFeePart;
-   const pnl=sellNet-buyCost;
-   p.remaining-=q;remaining-=q;
-   p.matched+=q;p.tProfit+=pnl;
-   tRecords.push({
-    code:buy.code,name:buy.name,type:buy.type,
-    sellDate:p.date,buyDate:buy.date,
-    sellPrice:p.price,buyPrice:buy.price,qty:q,
-    sellFee:sellFeePart,buyFee:buyFeePart,pnl,
-    tGroup:p.tGroup||"自动FIFO"
-   });
-  }
-  return remaining;
- }
+function snapshot(date){
+Object.entries(book).forEach(([code,d])=>{
+const qty=d.lots.reduce((a,l)=>a+Math.max(0,l.remaining),0);
+const cost=d.lots.reduce((a,l)=>a+Math.max(0,l.remaining)*l.unitCost,0);
+const ownT=tRecords.filter(r=>r.code===code).reduce((a,r)=>a+r.pnl,0);
+if(!history[code])history[code]=[];
+const last=history[code][history[code].length-1];
+const point={
+date,qty,cost,avg:qty>0?cost/qty:null,
+adjusted:qty>0?(cost-ownT)/qty:null
+};
+if(last&&last.date===date)history[code][history[code].length-1]=point;
+else history[code].push(point);
+});
+}
 
- for(const t of ts){
-  const d=book[t.code];if(!d)continue;
-  const fee=feeOf(t);d.fees+=fee;totalFees+=fee;
-  const amount=num(t.price)*num(t.qty);
-  if(t.side==="BUY"){
-   let remaining=num(t.qty);
-   const feePerUnit=fee/num(t.qty);
-   remaining=matchBuyToPending(t,remaining,feePerUnit);
-   // 买入批次全部进入持仓；被匹配的部分也是真实买入持仓。
-   d.lots.push({qty:num(t.qty),remaining:num(t.qty),unitCost:(amount+fee)/num(t.qty),date:t.date,tradeId:t.id});
-  }else{
-   let need=num(t.qty),cost=0;
-   for(const lot of d.lots){
-    if(need<=0)break;
-    const take=Math.min(need,lot.remaining);
-    cost+=take*lot.unitCost;lot.remaining-=take;need-=take;
-   }
-   if(need>0.000001){d.invalid=true;d.invalidQty=need}
-   const valid=num(t.qty)-need;
-   const sellFee=fee*(valid/num(t.qty));
-   const pnl=valid*num(t.price)-sellFee-cost;
-   d.realized+=pnl;realized+=pnl;
-   pending.push({
-    id:t.id,code:t.code,name:t.name,type:t.type,date:t.date,
-    price:num(t.price),qty:num(t.qty),fee,remaining:num(t.qty),
-    matched:0,tProfit:0,closed:!!t.closed,tGroup:t.tGroup||""
-   });
-  }
- }
- const positions=[];
- let totalCost=0,totalQty=0;
- Object.values(book).forEach(d=>{
-  const qty=d.lots.reduce((a,l)=>a+l.remaining,0);
-  const cost=d.lots.reduce((a,l)=>a+l.remaining*l.unitCost,0);
-  d.qty=qty;d.cost=cost;d.avg=qty?cost/qty:0;
-  if(qty>0){positions.push(d);totalCost+=cost;totalQty+=qty}
- });
- const tProfit=tRecords.reduce((a,r)=>a+r.pnl,0);
- const pendingRows=pending.filter(p=>p.remaining>0&&!p.closed);
- const pendingQty=pendingRows.reduce((a,p)=>a+p.remaining,0);
- return {book,positions,totalCost,totalQty,avgAll:totalQty?totalCost/totalQty:0,
-  realized,totalFees,tProfit,adjustedAvg:totalQty?(totalCost-tProfit)/totalQty:0,
-  pendingRows,pendingQty,tRecords};
+function matchBuyToPending(buy,remaining,feePerUnit){
+const candidates=pending.filter(p=>
+!p.closed&&p.code===buy.code&&p.remaining>0&&
+String(p.tGroup||"")===String(buy.tGroup||"")&&
+String(p.date)<=String(buy.date)
+);
+for(const p of candidates){
+if(remaining<=0)break;
+const q=Math.min(remaining,p.remaining);
+const sellFeePart=p.fee*(q/p.qty);
+const buyFeePart=feePerUnit*q;
+const sellNet=q*p.price-sellFeePart;
+const buyCost=q*buy.price+buyFeePart;
+const pnl=sellNet-buyCost;
+p.remaining-=q;
+remaining-=q;
+p.matched+=q;
+p.tProfit+=pnl;
+tRecords.push({
+code:buy.code,name:buy.name,type:buy.type,
+sellDate:p.date,buyDate:buy.date,
+sellPrice:p.price,buyPrice:buy.price,qty:q,
+sellFee:sellFeePart,buyFee:buyFeePart,pnl,
+tGroup:p.tGroup||"自动FIFO"
+});
+}
+return remaining;
+}
+
+for(const t of ts){
+const d=book[t.code];
+if(!d)continue;
+const qty=num(t.qty),price=num(t.price);
+if(qty<=0||price<=0)continue;
+const fee=feeOf(t);
+d.fees+=fee;
+totalFees+=fee;
+
+if(t.side==="BUY"){
+const feePerUnit=fee/qty;
+matchBuyToPending(t,qty,feePerUnit);
+/* 关键：买回的全部数量重新形成真实持仓批次，T匹配本身不重复增加成本 */
+d.lots.push({
+qty,remaining:qty,
+unitCost:(price*qty+fee)/qty,
+date:t.date,tradeId:t.id
+});
+}else{
+let need=qty,cost=0;
+for(const lot of d.lots){
+if(need<=0)break;
+const available=Math.max(0,lot.remaining);
+const take=Math.min(need,available);
+cost+=take*lot.unitCost;
+lot.remaining-=take;
+need-=take;
+}
+if(need>0.000001){
+d.invalid=true;
+d.invalidQty+=need;
+}
+const valid=qty-need;
+const sellFee=fee*(valid/qty);
+const pnl=valid*price-sellFee-cost;
+d.realized+=pnl;
+realized+=pnl;
+pending.push({
+id:t.id,code:t.code,name:t.name,type:t.type,date:t.date,
+price,qty,fee,remaining:valid,
+matched:0,tProfit:0,closed:!!t.closed,tGroup:t.tGroup||""
+});
+}
+const day=String(t.date||"").slice(0,10);
+snapshot(day);
+}
+
+const positions=[];
+let totalCost=0,totalQty=0;
+Object.values(book).forEach(d=>{
+/* 过滤极小浮点误差，确保已卖完的批次不残留 */
+d.lots.forEach(l=>{if(Math.abs(l.remaining)<0.000001)l.remaining=0});
+const qty=d.lots.reduce((a,l)=>a+l.remaining,0);
+const cost=d.lots.reduce((a,l)=>a+l.remaining*l.unitCost,0);
+d.qty=qty;
+d.cost=cost;
+d.avg=qty>0?cost/qty:0;
+if(qty>0){
+positions.push(d);
+totalCost+=cost;
+totalQty+=qty;
+}
+});
+const tProfit=tRecords.reduce((a,r)=>a+r.pnl,0);
+const pendingRows=pending.filter(p=>p.remaining>0&&!p.closed);
+const pendingQty=pendingRows.reduce((a,p)=>a+p.remaining,0);
+return {
+book,positions,totalCost,totalQty,
+avgAll:totalQty?totalCost/totalQty:0,
+realized,totalFees,tProfit,
+adjustedAvg:totalQty?(totalCost-tProfit)/totalQty:0,
+pendingRows,pendingQty,tRecords,history
+};
 }
 
 function render(){
- const c=calculate();
- setMetric("totalCost",fmt(c.totalCost),"gold");
- setMetric("avgAll",c.positions.length===1?fmt(c.positions[0].avg):"按证券分别查看","gold");
- setMetric("tProfit",fmt(c.tProfit),c.tProfit>=0?"red":"green");
- setMetric("adjustedAvg","按证券分别查看","gold");
- setMetric("realized",fmt(c.realized),c.realized>=0?"red":"green");
- setMetric("fees",fmt(c.totalFees),"");
- document.getElementById("securityCount").textContent=c.positions.length;
- document.getElementById("pendingCount").textContent=fmt(c.pendingQty);
- renderPositions(c);renderT(c);renderTrades();
- persist();
+const c=calculate();
+setMetric("totalCost",fmt(c.totalCost),"gold");
+setMetric("avgAll",c.positions.length===1?fmt(c.positions[0].avg):"按证券分别查看","gold");
+setMetric("tProfit",fmt(c.tProfit),c.tProfit>=0?"red":"green");
+setMetric("adjustedAvg","按证券分别查看","gold");
+setMetric("realized",fmt(c.realized),c.realized>=0?"red":"green");
+setMetric("fees",fmt(c.totalFees),"");
+document.getElementById("securityCount").textContent=c.positions.length;
+document.getElementById("pendingCount").textContent=fmt(c.pendingQty);
+renderPositions(c);
+renderT(c);
+renderTrades();
+renderChart(c);
+persist();
 }
 function setMetric(id,value,cls){
- const e=document.getElementById(id);e.textContent=value;e.className=cls||"";
+const e=document.getElementById(id);
+e.textContent=value;
+e.className=cls||"";
 }
+
 function renderPositions(c){
- const el=document.getElementById("positionList");
- if(!c.positions.length){el.innerHTML='<div class="card empty">暂无持仓，请先录入买入交易</div>';return}
- el.innerHTML=c.positions.map(p=>{
-  const type=p.security.type,cl=type==="ETF"?"etf":"stock";
-  const adj=p.qty?(p.cost-c.tProfit)/p.qty:p.avg;
-  const ownT=c.tRecords.filter(r=>r.code===p.security.code).reduce((a,r)=>a+r.pnl,0);
-  const ownPending=c.pendingRows.filter(r=>r.code===p.security.code).reduce((a,r)=>a+r.remaining,0);
-  return `<div class="card">
-   <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-    <div><b>${esc(p.security.name)}</b> <span class="tag ${cl}">${type==="ETF"?"ETF":"个股"}</span>
-     <div class="small muted" style="margin-top:5px">${esc(p.security.code)}</div></div>
-    <div style="text-align:right"><div class="gold" style="font-size:18px;font-weight:700">${fmt(p.cost)}元</div><div class="small muted">真实剩余持仓成本</div></div>
-   </div>
-   <div class="grid" style="margin-top:12px">
-    <div class="stat"><small>持仓数量</small><strong>${p.qty.toLocaleString()}</strong></div>
-    <div class="stat"><small>真实持仓均价</small><strong class="gold">${fmt(p.avg)}</strong></div>
-    <div class="stat"><small>该证券T净利润</small><strong class="${ownT>=0?'red':'green'}">${fmt(ownT)}</strong></div>
-    <div class="stat"><small>T利润摊薄参考均价</small><strong>${fmt((p.cost-ownT)/p.qty)}</strong></div>
-    <div class="stat"><small>已实现盈亏</small><strong class="${p.realized>=0?'red':'green'}">${fmt(p.realized)}</strong></div>
-    <div class="stat"><small>待回补数量</small><strong>${ownPending.toLocaleString()}</strong></div>
-   </div>
-   ${p.invalid?'<p class="small green">⚠ 卖出数量超过当时可用持仓，请检查流水。</p>':''}
-  </div>`;
- }).join("");
+const el=document.getElementById("positionList");
+if(!c.positions.length){
+el.innerHTML='<div class="card empty">暂无持仓，请先录入买入交易</div>';
+return;
+}
+el.innerHTML=c.positions.map(p=>{
+const type=p.security.type,cl=type==="ETF"?"etf":"stock";
+const ownT=c.tRecords.filter(r=>r.code===p.security.code).reduce((a,r)=>a+r.pnl,0);
+const ownPending=c.pendingRows.filter(r=>r.code===p.security.code).reduce((a,r)=>a+r.remaining,0);
+const adjusted=(p.cost-ownT)/p.qty;
+return `<div class="card">
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+<div><b>${esc(p.security.name)}</b> <span class="tag ${cl}">${type==="ETF"?"ETF":"个股"}</span>
+<div class="small muted" style="margin-top:5px">${esc(p.security.code)}</div></div>
+<div style="text-align:right"><div class="gold" style="font-size:18px;font-weight:700">${fmt(p.cost)}元</div><div class="small muted">真实剩余持仓成本</div></div>
+</div>
+<div class="grid" style="margin-top:12px">
+<div class="stat"><small>持仓数量</small><strong>${p.qty.toLocaleString()}</strong></div>
+<div class="stat"><small>真实持仓均价</small><strong class="gold">${fmt(p.avg)}</strong></div>
+<div class="stat"><small>该证券T净利润</small><strong class="${ownT>=0?'red':'green'}">${fmt(ownT)}</strong></div>
+<div class="stat"><small>T利润摊薄参考均价</small><strong class="etf">${fmt(adjusted)}</strong></div>
+<div class="stat"><small>已实现盈亏</small><strong class="${p.realized>=0?'red':'green'}">${fmt(p.realized)}</strong></div>
+<div class="stat"><small>待回补数量</small><strong>${ownPending.toLocaleString()}</strong></div>
+</div>
+${p.invalid?'<p class="small green">⚠ 卖出数量超过当时可用持仓，请检查流水。</p>':''}
+</div>`;
+}).join("");
+}
+
+function renderChart(c){
+const secEl=document.getElementById("chartSecurity");
+const allSecs=securities();
+const old=secEl.value;
+secEl.innerHTML=allSecs.map(s=>`<option value="${esc(s.code)}">${esc(s.name)}（${esc(s.code)}）</option>`).join("");
+if(allSecs.some(s=>s.code===old))secEl.value=old;
+if(!secEl.value&&allSecs.length)secEl.value=allSecs[0].code;
+drawChart(c);
+}
+function dateLocal(d){
+const x=new Date(d);
+return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
+}
+function drawChart(c){
+const svg=document.getElementById("costChart");
+const code=document.getElementById("chartSecurity").value;
+const points=(c.history[code]||[]).filter(p=>p.qty>0&&p.avg!==null);
+if(!points.length){
+svg.innerHTML='<text x="350" y="145" fill="#888" text-anchor="middle" font-size="14">暂无该证券的持仓成本历史数据</text>';
+document.getElementById("chartReal").textContent="—";
+document.getElementById("chartAdjusted").textContent="—";
+document.getElementById("chartPeriod").textContent="录入该证券交易后，将自动生成成本曲线。";
+return;
+}
+let start,end;
+if(chartCustom){
+start=document.getElementById("chartStart").value;
+end=document.getElementById("chartEnd").value;
+if(!start||!end||start>end){
+svg.innerHTML='<text x="350" y="145" fill="#aaa" text-anchor="middle" font-size="14">请选择正确的开始日期和结束日期</text>';
+return;
+}
+}else{
+end=dateLocal(new Date());
+const d=new Date();
+d.setDate(d.getDate()-Number(chartRange));
+start=dateLocal(d);
+}
+let filtered=points.filter(p=>p.date>=start&&p.date<=end);
+if(!filtered.length){
+svg.innerHTML='<text x="350" y="145" fill="#888" text-anchor="middle" font-size="14">该时间范围内没有持仓数据</text>';
+document.getElementById("chartReal").textContent="—";
+document.getElementById("chartAdjusted").textContent="—";
+document.getElementById("chartPeriod").textContent=start+" 至 "+end+"：暂无持仓数据。";
+return;
+}
+/* 时间范围内首日没有成交时，取范围开始前最近一次持仓快照作为起点 */
+const before=points.filter(p=>p.date<start).slice(-1)[0];
+if(before&&before.qty>0)filtered.unshift({...before,date:start});
+const values=filtered.flatMap(p=>[p.avg,p.adjusted]).filter(v=>Number.isFinite(v));
+let min=Math.min(...values),max=Math.max(...values);
+if(max===min){max+=0.01;min-=0.01}
+const pad=(max-min)*.18;
+min-=pad;max+=pad;
+const W=700,H=300,L=65,R=18,T=20,B=42;
+const x=i=>L+(filtered.length===1?0:i/(filtered.length-1))*(W-L-R);
+const y=v=>T+(max-v)/(max-min)*(H-T-B);
+const path=(key,color)=>{
+const segments=[];
+let current=[];
+filtered.forEach((p,i)=>{
+const v=p[key];
+if(v===null||!Number.isFinite(v)){
+if(current.length)segments.push(current);
+current=[];
+}else current.push([x(i),y(v)]);
+});
+if(current.length)segments.push(current);
+return segments.map(seg=>`<polyline points="${seg.map(p=>p.join(",")).join(" ")}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+};
+let html="";
+for(let i=0;i<=4;i++){
+const v=min+(max-min)*i/4;
+const yy=y(v);
+html+=`<line x1="${L}" y1="${yy}" x2="${W-R}" y2="${yy}" stroke="#333" stroke-dasharray="4 5"/>`;
+html+=`<text x="${L-9}" y="${yy+4}" fill="#999" text-anchor="end" font-size="11">${v.toFixed(3)}</text>`;
+}
+html+=path("avg","#D6A64B");
+html+=path("adjusted","#36B9A5");
+const indexes=[0,Math.floor((filtered.length-1)/2),filtered.length-1];
+indexes.forEach(i=>{
+html+=`<text x="${x(i)}" y="${H-13}" fill="#999" text-anchor="middle" font-size="10">${filtered[i].date.slice(5)}</text>`;
+});
+filtered.forEach((p,i)=>{
+if(i===0||i===filtered.length-1||i===Math.floor((filtered.length-1)/2)){
+html+=`<circle cx="${x(i)}" cy="${y(p.avg)}" r="4" fill="#D6A64B"/>`;
+html+=`<circle cx="${x(i)}" cy="${y(p.adjusted)}" r="4" fill="#36B9A5"/>`;
+}
+});
+svg.innerHTML=html;
+const latest=filtered[filtered.length-1];
+document.getElementById("chartReal").textContent=fmt(latest.avg)+" 元";
+document.getElementById("chartAdjusted").textContent=fmt(latest.adjusted)+" 元";
+document.getElementById("chartPeriod").textContent=
+"展示范围："+start+" 至 "+end+"；最新数据日期："+latest.date+"。纵轴单位：元/份。";
 }
 function renderT(c){
- document.getElementById("tSummary").innerHTML=
- `<div class="grid">
-  <div class="stat"><small>累计已匹配T净利润</small><strong class="${c.tProfit>=0?'red':'green'}">${fmt(c.tProfit)}</strong></div>
-  <div class="stat"><small>已匹配T记录</small><strong>${c.tRecords.length}笔</strong></div>
-  <div class="stat"><small>待回补卖出记录</small><strong>${c.pendingRows.length}笔</strong></div>
-  <div class="stat"><small>待回补数量</small><strong>${c.pendingQty.toLocaleString()}</strong></div>
- </div>`;
- const el=document.getElementById("tRecords");
- const rows=c.tRecords;
- let html=rows.length?`<div class="card table-wrap"><table>
- <thead><tr><th>证券</th><th>卖出日期</th><th>买回日期</th><th>卖出价</th><th>买回价</th><th>匹配数量</th><th>本次T净利润</th><th>T组</th></tr></thead>
- <tbody>${rows.map(r=>`<tr>
- <td style="text-align:left">${esc(r.name)}<br><span class="muted">${esc(r.code)}</span></td>
- <td>${esc(r.sellDate)}</td><td>${esc(r.buyDate)}</td>
- <td>${fmt(r.sellPrice)}</td><td>${fmt(r.buyPrice)}</td><td>${r.qty}</td>
- <td class="${r.pnl>=0?'red':'green'}">${fmt(r.pnl)}</td><td>${esc(r.tGroup)}</td>
- </tr>`).join("")}</tbody></table></div>`:'<div class="card empty">暂无已匹配的T记录。录入卖出后，再录入同证券的买入，即可自动匹配。</div>';
- if(c.pendingRows.length){
-  html+=`<div class="title">待回补 / 未完成T</div>`;
-  html+=c.pendingRows.map(p=>`<div class="card">
-   <div style="display:flex;justify-content:space-between;gap:10px">
-    <div><b>${esc(p.name)}</b><div class="small muted">${esc(p.code)} · 卖出 ${esc(p.date)}</div>
-    <div class="small muted">卖出价 ${fmt(p.price)} · 原始数量 ${p.qty} · 剩余待回补 ${p.remaining}</div>
-    <div class="small muted">T组：${esc(p.tGroup||"自动FIFO")} · 已匹配净利润：${fmt(p.tProfit)}</div></div>
-    <button class="secondary" onclick="closeRound('${p.id}')">结束此轮T</button>
-   </div></div>`).join("");
- }
- el.innerHTML=html;
+document.getElementById("tSummary").innerHTML=
+`<div class="grid">
+<div class="stat"><small>累计已匹配T净利润</small><strong class="${c.tProfit>=0?'red':'green'}">${fmt(c.tProfit)}</strong></div>
+<div class="stat"><small>已匹配T记录</small><strong>${c.tRecords.length}笔</strong></div>
+<div class="stat"><small>待回补卖出记录</small><strong>${c.pendingRows.length}笔</strong></div>
+<div class="stat"><small>待回补数量</small><strong>${c.pendingQty.toLocaleString()}</strong></div>
+</div>`;
+const el=document.getElementById("tRecords");
+const rows=c.tRecords;
+let html=rows.length?`<div class="card table-wrap"><table>
+<thead><tr><th>证券</th><th>卖出日期</th><th>买回日期</th><th>卖出价</th><th>买回价</th><th>匹配数量</th><th>本次T净利润</th><th>T组</th></tr></thead>
+<tbody>${rows.map(r=>`<tr>
+<td style="text-align:left">${esc(r.name)}<br><span class="muted">${esc(r.code)}</span></td>
+<td>${esc(r.sellDate)}</td><td>${esc(r.buyDate)}</td>
+<td>${fmt(r.sellPrice)}</td><td>${fmt(r.buyPrice)}</td><td>${r.qty}</td>
+<td class="${r.pnl>=0?'red':'green'}">${fmt(r.pnl)}</td><td>${esc(r.tGroup)}</td>
+</tr>`).join("")}</tbody></table></div>`:
+'<div class="card empty">暂无已匹配的T记录。录入卖出后，再录入同证券的买入，即可自动匹配。</div>';
+if(c.pendingRows.length){
+html+='<div class="title">待回补 / 未完成T</div>';
+html+=c.pendingRows.map(p=>`<div class="card">
+<div style="display:flex;justify-content:space-between;gap:10px">
+<div><b>${esc(p.name)}</b><div class="small muted">${esc(p.code)} · 卖出 ${esc(p.date)}</div>
+<div class="small muted">卖出价 ${fmt(p.price)} · 原始数量 ${p.qty} · 剩余待回补 ${p.remaining}</div>
+<div class="small muted">T组：${esc(p.tGroup||"自动FIFO")} · 已匹配净利润：${fmt(p.tProfit)}</div></div>
+<button class="secondary" onclick="closeRound('${p.id}')">结束此轮T</button>
+</div></div>`).join("");
+}
+el.innerHTML=html;
 }
 function closeRound(id){
- if(!confirm("结束这笔卖出的T轮次？未回补数量将不再自动匹配后续买入。"))return;
- const t=state.trades.find(x=>x.id===id);
- if(t){t.closed=true;render()}
+if(!confirm("结束这笔卖出的T轮次？未回补数量将不再自动匹配后续买入。"))return;
+const t=state.trades.find(x=>x.id===id);
+if(t){t.closed=true;render()}
 }
 function renderTrades(){
- const el=document.getElementById("tradeList");
- let a=sortedTrades().reverse();
- if(tradeFilter!=="all")a=a.filter(t=>t.side===tradeFilter);
- if(!a.length){el.innerHTML='<div class="card empty">暂无交易记录</div>';return}
- el.innerHTML=`<div class="card table-wrap"><table><thead><tr>
- <th>日期 / 证券</th><th>方向</th><th>价格</th><th>数量</th><th>成交金额</th><th>费用</th><th>T组</th><th>操作</th>
- </tr></thead><tbody>${a.map(t=>`<tr>
- <td style="text-align:left">${esc(t.date)}<br><b>${esc(t.name)}</b><br><span class="muted">${esc(t.code)}</span></td>
- <td class="${t.side==='BUY'?'red':'green'}">${t.side==='BUY'?'买入':'卖出'}</td>
- <td>${fmt(t.price)}</td><td>${t.qty}</td><td>${fmt(t.price*t.qty)}</td><td>${fmt(feeOf(t))}</td>
- <td>${esc(t.tGroup||"自动")}${t.closed?' / 已结束':''}</td>
- <td><button class="secondary" onclick="editTrade('${t.id}')">编辑</button>
- <button class="danger" onclick="deleteTrade('${t.id}')">删除</button></td>
- </tr>`).join("")}</tbody></table></div>`;
+const el=document.getElementById("tradeList");
+let a=sortedTrades().reverse();
+if(tradeFilter!=="all")a=a.filter(t=>t.side===tradeFilter);
+if(!a.length){el.innerHTML='<div class="card empty">暂无交易记录</div>';return}
+el.innerHTML=`<div class="card table-wrap"><table><thead><tr>
+<th>日期 / 证券</th><th>方向</th><th>价格</th><th>数量</th><th>成交金额</th><th>费用</th><th>T组</th><th>操作</th>
+</tr></thead><tbody>${a.map(t=>`<tr>
+<td style="text-align:left">${esc(t.date)}<br><b>${esc(t.name)}</b><br><span class="muted">${esc(t.code)}</span></td>
+<td class="${t.side==='BUY'?'red':'green'}">${t.side==='BUY'?'买入':'卖出'}</td>
+<td>${fmt(t.price)}</td><td>${t.qty}</td><td>${fmt(t.price*t.qty)}</td><td>${fmt(feeOf(t))}</td>
+<td>${esc(t.tGroup||"自动")}${t.closed?' / 已结束':''}</td>
+<td><button class="secondary" onclick="editTrade('${t.id}')">编辑</button>
+<button class="danger" onclick="deleteTrade('${t.id}')">删除</button></td>
+</tr>`).join("")}</tbody></table></div>`;
 }
 function filterTrades(f){tradeFilter=f;renderTrades()}
 function switchTab(tab){
- document.querySelectorAll("[id^=page-]").forEach(x=>x.classList.add("hidden"));
- document.getElementById("page-"+tab).classList.remove("hidden");
- document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
- if(tab==="settings")loadSettings();
+document.querySelectorAll("[id^=page-]").forEach(x=>x.classList.add("hidden"));
+document.getElementById("page-"+tab).classList.remove("hidden");
+document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
+if(tab==="settings")loadSettings();
+if(tab==="positions")renderChart(calculate());
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 
+document.querySelectorAll(".range-btn").forEach(b=>b.addEventListener("click",()=>{
+document.querySelectorAll(".range-btn").forEach(x=>x.classList.remove("active"));
+b.classList.add("active");
+chartCustom=b.dataset.range==="custom";
+document.getElementById("customDates").classList.toggle("hidden",!chartCustom);
+if(!chartCustom)chartRange=Number(b.dataset.range);
+drawChart(calculate());
+}));
+document.getElementById("chartSecurity").addEventListener("change",()=>drawChart(calculate()));
+document.getElementById("chartStart").addEventListener("change",()=>drawChart(calculate()));
+document.getElementById("chartEnd").addEventListener("change",()=>drawChart(calculate()));
+
 function resetForm(){
- document.getElementById("tradeForm").reset();
- document.getElementById("editId").value="";
- document.getElementById("formTitle").textContent="录入交易";
- document.getElementById("saveBtn").textContent="保存交易";
- document.getElementById("date").value=new Date().toISOString().slice(0,16);
+document.getElementById("tradeForm").reset();
+document.getElementById("editId").value="";
+document.getElementById("formTitle").textContent="录入交易";
+document.getElementById("saveBtn").textContent="保存交易";
+document.getElementById("saveBtn").disabled=false;
+const now=new Date();
+now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+document.getElementById("date").value=now.toISOString().slice(0,16);
 }
 function editTrade(id){
- const t=state.trades.find(x=>x.id===id);if(!t)return;
- switchTab("add");
- ["code","name","type","side","date","price","qty","memo","tGroup"].forEach(k=>{
-  const v=k==="tGroup"?t.tGroup||"":t[k];
-  document.getElementById(k).value=v??"";
- });
- document.getElementById("fee").value=t.fee??"";
- document.getElementById("editId").value=id;
- document.getElementById("formTitle").textContent="修改交易记录";
- document.getElementById("saveBtn").textContent="保存修改";
+const t=state.trades.find(x=>x.id===id);
+if(!t)return;
+switchTab("add");
+["code","name","type","side","date","price","qty","memo","tGroup"].forEach(k=>{
+const v=k==="tGroup"?t.tGroup||"":t[k];
+document.getElementById(k).value=v??"";
+});
+document.getElementById("fee").value=t.fee??"";
+document.getElementById("editId").value=id;
+document.getElementById("formTitle").textContent="修改交易记录";
+document.getElementById("saveBtn").textContent="保存修改";
 }
 function deleteTrade(id){
- if(!confirm("确定删除此笔交易？删除后所有FIFO和T收益将重新计算。"))return;
- state.trades=state.trades.filter(t=>t.id!==id);render();
+if(!confirm("确定删除此笔交易？删除后所有FIFO和T收益将重新计算。"))return;
+state.trades=state.trades.filter(t=>t.id!==id);
+render();
 }
+
 document.getElementById("tradeForm").addEventListener("submit",e=>{
- e.preventDefault();
- const editId=document.getElementById("editId").value;
- const old=state.trades.find(t=>t.id===editId);
- const t={
-  id:editId||id(),code:document.getElementById("code").value.trim(),
-  name:document.getElementById("name").value.trim(),
-  type:document.getElementById("type").value,side:document.getElementById("side").value,
-  date:document.getElementById("date").value,price:num(document.getElementById("price").value),
-  qty:num(document.getElementById("qty").value),
-  fee:document.getElementById("fee").value===""?null:num(document.getElementById("fee").value),
-  tGroup:document.getElementById("tGroup").value.trim(),
-  memo:document.getElementById("memo").value.trim(),
-  created:old?old.created:Date.now(),closed:old?!!old.closed:false
- };
- if(!t.code||!t.name||!t.date||t.price<=0||t.qty<=0){alert("请检查必填信息");return}
- if(t.qty%100!==0){alert("数量请按100股/份整数倍录入");return}
- const prev=state.trades;state.trades=prev.filter(x=>x.id!==editId).concat(t);
- const c=calculate();
- if(Object.values(c.book).some(d=>d.invalid)){
-  state.trades=prev;alert("卖出数量超过当时可用持仓，已取消保存。请检查历史买入、卖出日期和数量。");return;
- }
- const s=state.securities.find(x=>x.code===t.code);
- if(s){s.name=t.name;s.type=t.type}else state.securities.push({code:t.code,name:t.name,type:t.type});
- render();resetForm();switchTab("positions");alert("交易已保存，持仓和T收益已重新计算。");
+e.preventDefault();
+const btn=document.getElementById("saveBtn");
+if(btn.disabled)return;
+btn.disabled=true;
+try{
+const editId=document.getElementById("editId").value;
+const old=state.trades.find(t=>t.id===editId);
+const t={
+id:editId||id(),
+code:document.getElementById("code").value.trim(),
+name:document.getElementById("name").value.trim(),
+type:document.getElementById("type").value,
+side:document.getElementById("side").value,
+date:document.getElementById("date").value,
+price:num(document.getElementById("price").value),
+qty:num(document.getElementById("qty").value),
+fee:document.getElementById("fee").value===""?null:num(document.getElementById("fee").value),
+tGroup:document.getElementById("tGroup").value.trim(),
+memo:document.getElementById("memo").value.trim(),
+created:old?old.created:Date.now(),
+closed:old?!!old.closed:false
+};
+if(!t.code||!t.name||!t.date||t.price<=0||t.qty<=0)throw Error("请检查必填信息");
+if(t.qty%100!==0)throw Error("数量请按100股/份整数倍录入");
+if(t.fee!==null&&t.fee<0)throw Error("费用不能小于0");
+const prev=state.trades;
+state.trades=prev.filter(x=>x.id!==editId).concat(t);
+const c=calculate();
+if(Object.values(c.book).some(d=>d.invalid)){
+state.trades=prev;
+throw Error("卖出数量超过当时可用持仓，已取消保存。请检查历史买入、卖出日期和数量。");
+}
+const s=state.securities.find(x=>x.code===t.code);
+if(s){s.name=t.name;s.type=t.type}
+else state.securities.push({code:t.code,name:t.name,type:t.type});
+render();
+resetForm();
+switchTab("positions");
+alert("交易已保存，持仓和T收益已重新计算。");
+}catch(err){
+alert(err.message);
+btn.disabled=false;
+}
 });
+
 function loadSettings(){
- Object.entries(state.settings).forEach(([k,v])=>{const e=document.getElementById(k);if(e)e.value=v});
+Object.entries(state.settings).forEach(([k,v])=>{
+const e=document.getElementById(k);
+if(e)e.value=v;
+});
 }
 function saveSettings(){
- const keys=Object.keys(state.settings),next={};
- for(const k of keys){
-  const v=Number(document.getElementById(k).value);
-  if(!Number.isFinite(v)||v<0){alert("费率必须是大于或等于0的数字");return}
-  next[k]=v;
- }
- state.settings=next;render();alert("费率已保存");
+const keys=Object.keys(state.settings),next={};
+for(const k of keys){
+const v=Number(document.getElementById(k).value);
+if(!Number.isFinite(v)||v<0){alert("费率必须是大于或等于0的数字");return}
+next[k]=v;
+}
+state.settings=next;
+render();
+alert("费率已保存");
 }
 function blobDownload(blob,name){
- const u=URL.createObjectURL(blob),a=document.createElement("a");
- a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
+const u=URL.createObjectURL(blob),a=document.createElement("a");
+a.href=u;a.download=name;a.click();
+setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
-function backupJSON(){blobDownload(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),"做T成本账本完整备份.json")}
+function backupJSON(){
+blobDownload(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),"做T成本账本完整备份.json");
+}
 document.getElementById("jsonFile").addEventListener("change",async e=>{
- const f=e.target.files[0];if(!f)return;
- try{
-  const x=JSON.parse(await f.text());
-  if(!Array.isArray(x.trades)||!x.settings)throw Error("备份文件格式不正确");
-  if(!confirm("恢复会覆盖当前账本，确定继续？"))return;
-  state={securities:x.securities||[],trades:x.trades,settings:{...DEFAULT.settings,...x.settings}};
-  render();alert("恢复成功");
- }catch(err){alert("导入失败："+err.message)}
- e.target.value="";
+const f=e.target.files[0];
+if(!f)return;
+try{
+const x=JSON.parse(await f.text());
+if(!Array.isArray(x.trades)||!x.settings)throw Error("备份文件格式不正确");
+if(!confirm("恢复会覆盖当前账本，确定继续？"))return;
+state={
+securities:x.securities||[],
+trades:x.trades,
+settings:{...DEFAULT.settings,...x.settings}
+};
+render();
+alert("恢复成功");
+}catch(err){alert("导入失败："+err.message)}
+e.target.value="";
 });
 function exportExcel(){
- if(!window.XLSX){alert("Excel组件未加载，请联网后重试，或使用CSV模板");return}
- const rows=state.trades.map(t=>({code:t.code,name:t.name,type:t.type,side:t.side,date:t.date,price:t.price,qty:t.qty,fee:t.fee??"",tGroup:t.tGroup||"",memo:t.memo||"",closed:t.closed?"是":"否"}));
- const wb=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),"交易流水");
- XLSX.writeFile(wb,"做T成本账本交易流水.xlsx");
+if(!window.XLSX){alert("Excel组件未加载，请联网后重试，或使用CSV模板");return}
+const rows=state.trades.map(t=>({
+code:t.code,name:t.name,type:t.type,side:t.side,date:t.date,
+price:t.price,qty:t.qty,fee:t.fee??"",tGroup:t.tGroup||"",
+memo:t.memo||"",closed:t.closed?"是":"否"
+}));
+const wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),"交易流水");
+XLSX.writeFile(wb,"做T成本账本交易流水.xlsx");
 }
 function downloadTemplate(){
- const csv="code,name,type,side,date,price,qty,fee,tGroup,memo\n515450,红利低波ETF,ETF,BUY,2026-11-06T10:00,1.200,1000,,T01,首次买入\n";
- blobDownload(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),"做T成本账本导入模板.csv");
+const csv="code,name,type,side,date,price,qty,fee,tGroup,memo\n515450,红利低波ETF,ETF,BUY,2026-11-06T10:00,1.200,1000,,T01,首次买入\n";
+blobDownload(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),"做T成本账本导入模板.csv");
 }
 function parseCSV(text){
- const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());
- function row(s){
-  const a=[];let v="",q=false;
-  for(let i=0;i<s.length;i++){const c=s[i];
-   if(c==='"'&&s[i+1]==='"'&&q){v+='"';i++}
-   else if(c==='"')q=!q;else if(c===","&&!q){a.push(v);v=""}else v+=c;
-  }a.push(v);return a;
- }
- const h=row(lines.shift()).map(x=>x.trim());
- return lines.map(line=>{const a=row(line),o={};h.forEach((k,i)=>o[k]=a[i]??"");return o});
+const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());
+function row(s){
+const a=[];let v="",q=false;
+for(let i=0;i<s.length;i++){
+const c=s[i];
+if(c==='"'&&s[i+1]==='"'&&q){v+='"';i++}
+else if(c==='"')q=!q;
+else if(c===","&&!q){a.push(v);v=""}
+else v+=c;
+}
+a.push(v);
+return a;
+}
+const h=row(lines.shift()).map(x=>x.trim());
+return lines.map(line=>{
+const a=row(line),o={};
+h.forEach((k,i)=>o[k]=a[i]??"");
+return o;
+});
 }
 document.getElementById("excelFile").addEventListener("change",async e=>{
- const f=e.target.files[0];if(!f)return;
- try{
-  let rows;
-  if(f.name.toLowerCase().endsWith(".csv"))rows=parseCSV(await f.text());
-  else{
-   if(!window.XLSX)throw Error("Excel组件未加载，请连接网络后重试");
-   const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
-   rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
-  }
-  const list=rows.map(r=>{
-   const side=String(r.side||r.方向||"").toUpperCase();
-   const type=String(r.type||r.类型||"ETF").toUpperCase();
-   const date=String(r.date||r.成交时间||r.日期||"").replace(" ","T").slice(0,16);
-   const fee=r.fee??r.手续费??"";
-   return {id:id(),code:String(r.code||r.证券代码||"").trim(),name:String(r.name||r.证券名称||"").trim(),
-    type:(type.includes("STOCK")||type.includes("股票")||type.includes("个股"))?"STOCK":"ETF",
-    side:(side==="BUY"||side.includes("买"))?"BUY":"SELL",date,
-    price:num(r.price||r.成交价格),qty:num(r.qty||r.成交数量),
-    fee:fee===""?null:num(fee),tGroup:String(r.tGroup||r.T组||"").trim(),
-    memo:String(r.memo||r.备注||""),created:Date.now()+Math.random(),closed:false};
-  }).filter(t=>t.code&&t.name&&t.date&&t.price>0&&t.qty>0);
-  if(!list.length)throw Error("未识别到有效交易，请检查模板字段");
-  if(!confirm("识别到"+list.length+"笔交易，确认追加导入？"))return;
-  const old=state.trades;state.trades=old.concat(list);
-  if(Object.values(calculate().book).some(d=>d.invalid)){state.trades=old;throw Error("有卖出数量超过历史持仓，导入已取消，请检查数据顺序")}
-  list.forEach(t=>{if(!state.securities.some(s=>s.code===t.code))state.securities.push({code:t.code,name:t.name,type:t.type})});
-  render();alert("成功导入"+list.length+"笔交易");
- }catch(err){alert("导入失败："+err.message)}
- e.target.value="";
+const f=e.target.files[0];
+if(!f)return;
+try{
+let rows;
+if(f.name.toLowerCase().endsWith(".csv"))rows=parseCSV(await f.text());
+else{
+if(!window.XLSX)throw Error("Excel组件未加载，请连接网络后重试");
+const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
+}
+const list=rows.map(r=>{
+const side=String(r.side||r.方向||"").toUpperCase();
+const type=String(r.type||r.类型||"ETF").toUpperCase();
+const date=String(r.date||r.成交时间||r.日期||"").replace(" ","T").slice(0,16);
+const fee=r.fee??r.手续费??"";
+return {
+id:id(),
+code:String(r.code||r.证券代码||"").trim(),
+name:String(r.name||r.证券名称||"").trim(),
+type:(type.includes("STOCK")||type.includes("股票")||type.includes("个股"))?"STOCK":"ETF",
+side:(side==="BUY"||side.includes("买"))?"BUY":"SELL",
+date,price:num(r.price||r.成交价格),
+qty:num(r.qty||r.成交数量),
+fee:fee===""?null:num(fee),
+tGroup:String(r.tGroup||r.T组||"").trim(),
+memo:String(r.memo||r.备注||""),
+created:Date.now()+Math.random(),closed:false
+};
+}).filter(t=>t.code&&t.name&&t.date&&t.price>0&&t.qty>0);
+if(!list.length)throw Error("未识别到有效交易，请检查模板字段");
+if(list.some(t=>t.qty%100!==0))throw Error("导入数据中存在非100股/份整数倍的数量");
+if(!confirm("识别到"+list.length+"笔交易，确认追加导入？"))return;
+const old=state.trades;
+state.trades=old.concat(list);
+const check=calculate();
+if(Object.values(check.book).some(d=>d.invalid)){
+state.trades=old;
+throw Error("有卖出数量超过历史持仓，导入已取消，请检查数据顺序");
+}
+list.forEach(t=>{
+if(!state.securities.some(s=>s.code===t.code)){
+state.securities.push({code:t.code,name:t.name,type:t.type});
+}
+});
+render();
+alert("成功导入"+list.length+"笔交易");
+}catch(err){alert("导入失败："+err.message)}
+e.target.value="";
 });
 function clearAll(){
- if(!confirm("确定删除全部账本数据？"))return;
- if(!confirm("此操作不可撤销，建议先备份。仍然清空吗？"))return;
- state=clone(DEFAULT);render();resetForm();
+if(!confirm("确定删除全部账本数据？"))return;
+if(!confirm("此操作不可撤销，建议先备份。仍然清空吗？"))return;
+state=clone(DEFAULT);
+render();
+resetForm();
 }
-resetForm();loadSettings();render();
+resetForm();
+loadSettings();
+render();
 </script>
 </body>
 </html>
